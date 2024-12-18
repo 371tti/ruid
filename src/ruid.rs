@@ -1,12 +1,13 @@
 use rand::RngCore;
-use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use chrono::Utc;
 
-use crate::prefix::Prefix;
+use crate::prefix::prefix;
 
-#[derive(Debug)]
+use std::fmt;
+
+#[derive(Debug, Clone)]
 pub struct Ruid {
     id: u128, // IDを保持する
 }
@@ -20,11 +21,44 @@ impl Ruid {
         self.id
     }
 
-    pub fn edit_prefix(&self, prefix: u16) -> Ruid{
-        let id = (self.id & !(0xFFFF << RuidGenerator::PREFIX_SHIFT)) | ((prefix as u128) << RuidGenerator::PREFIX_SHIFT);
-        Ruid { id: id }
+    pub fn edit_prefix(&self, prefix: u16) -> Ruid {
+        let id = (self.id & !(0xFFFF << RuidGenerator::PREFIX_SHIFT))
+            | ((prefix as u128) << RuidGenerator::PREFIX_SHIFT);
+        Ruid { id }
+    }
+
+    pub fn from_u128(id: u128) -> Self {
+        Ruid { id }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, ParseRuidError> {
+        if s.len() != 32 {
+            return Err(ParseRuidError::InvalidLength);
+        }
+
+        let id = u128::from_str_radix(s, 16).map_err(|_| ParseRuidError::InvalidFormat)?;
+        Ok(Ruid { id })
     }
 }
+
+// `FromStr` 実装用のエラー型
+#[derive(Debug)]
+pub enum ParseRuidError {
+    InvalidLength,
+    InvalidFormat,
+}
+
+impl fmt::Display for ParseRuidError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParseRuidError::InvalidLength => write!(f, "Ruid文字列の長さが無効です"),
+            ParseRuidError::InvalidFormat => write!(f, "Ruid文字列の形式が無効です"),
+        }
+    }
+}
+
+impl std::error::Error for ParseRuidError {}
+
 
 pub struct RuidGenerator {
     default_device_id: u16,
@@ -44,7 +78,7 @@ impl RuidGenerator {
         let rng = ChaCha20Rng::from_entropy();
         Self {
             default_device_id: 0x0000,
-            prefix: Prefix::UncategorizedData,
+            prefix: prefix::UNCATEGORIZED_DATA,
             device_id: 0x0000,
             rng,
         }
@@ -81,7 +115,7 @@ impl RuidGenerator {
         let id = Self::generator(prefix, device_id, timestamp, rand);
 
         // オプションの値をリセット
-        self.prefix = Prefix::UncategorizedData;
+        self.prefix = prefix::UNCATEGORIZED_DATA;
         self.device_id = self.default_device_id;
 
         Ruid { id }
