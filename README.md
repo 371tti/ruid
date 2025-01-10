@@ -1,4 +1,4 @@
-
+汎用性したい。
 
 ### RUID (Readable Unique Identifier) v1 Format
 
